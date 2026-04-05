@@ -1,0 +1,145 @@
+[
+  {
+    "id": "user-temp",
+    "displayName": "User Temp Files",
+    "description": "Cleans the current user's temporary folder.",
+    "categoryGroup": "System",
+    "badgeLabel": "Recommended",
+    "safetyNote": "Low risk. Temporary files are usually recreated as needed.",
+    "riskTier": "SafeDefault",
+    "requiresAdmin": false,
+    "includedInSafeDefaults": true
+  },
+  {
+    "id": "windows-temp",
+    "displayName": "Windows Temp Files",
+    "description": "Cleans the Windows temp directory. Some files may be skipped if they are in use.",
+    "categoryGroup": "Windows",
+    "badgeLabel": "Admin",
+    "safetyNote": "Windows may recreate some temporary files after updates or restarts.",
+    "riskTier": "SafeButAdmin",
+    "requiresAdmin": true,
+    "includedInSafeDefaults": false
+  },
+  {
+    "id": "windows-error-reporting",
+    "displayName": "Windows Error Reporting",
+    "description": "Cleans current-user Windows Error Reporting queue, archive, and temp data.",
+    "categoryGroup": "Diagnostics",
+    "badgeLabel": "Diagnostics",
+    "safetyNote": "Useful for troubleshooting only if you still need recent crash reports.",
+    "riskTier": "SafeDefault",
+    "requiresAdmin": false,
+    "includedInSafeDefaults": false
+  },
+  {
+    "id": "thumbnail-cache",
+    "displayName": "Thumbnail Cache",
+    "description": "Clears cached Explorer thumbnail databases.",
+    "categoryGroup": "Explorer",
+    "badgeLabel": "Recommended",
+    "safetyNote": "Explorer will rebuild thumbnail cache automatically when needed.",
+    "riskTier": "SafeDefault",
+    "requiresAdmin": false,
+    "includedInSafeDefaults": true
+  },
+  {
+    "id": "icon-cache",
+    "displayName": "Icon Cache",
+    "description": "Cleans Windows icon cache databases for the current user.",
+    "categoryGroup": "Explorer",
+    "badgeLabel": "Optional",
+    "safetyNote": "Windows will rebuild icon cache automatically after restart or folder refresh.",
+    "riskTier": "SafeDefault",
+    "requiresAdmin": false,
+    "includedInSafeDefaults": false
+  },
+  {
+    "id": "browser-cache",
+    "displayName": "Browser Cache",
+    "description": "Cleans common cache folders for Chrome, Edge, Brave, and Firefox profiles.",
+    "categoryGroup": "Browsers",
+    "badgeLabel": "Large",
+    "safetyNote": "Browsers may recreate cache files quickly. Some files can stay locked while a browser is open.",
+    "riskTier": "SafeDefault",
+    "requiresAdmin": false,
+    "includedInSafeDefaults": false
+  },
+  {
+    "id": "shader-cache",
+    "displayName": "Shader Cache",
+    "description": "Cleans DirectX and graphics shader cache folders for the current user.",
+    "categoryGroup": "Graphics",
+    "badgeLabel": "Recommended",
+    "safetyNote": "Graphics drivers and games may rebuild shader cache after the next launch.",
+    "riskTier": "SafeDefault",
+    "requiresAdmin": false,
+    "includedInSafeDefaults": true
+  },
+  {
+    "id": "crash-dumps",
+    "displayName": "Crash Dumps",
+    "description": "Removes application crash dump files from the current user profile.",
+    "categoryGroup": "Diagnostics",
+    "badgeLabel": "Optional",
+    "safetyNote": "Keep these if you are still debugging recent application crashes.",
+    "riskTier": "SafeDefault",
+    "requiresAdmin": false,
+    "includedInSafeDefaults": false
+  },
+  {
+    "id": "windows-update-download",
+    "displayName": "Windows Update Download Cache",
+    "description": "Cleans downloaded Windows Update packages that can accumulate over time.",
+    "categoryGroup": "Windows",
+    "badgeLabel": "Admin",
+    "safetyNote": "Windows may need to redownload update files later. Use when reclaiming large amounts of space.",
+    "riskTier": "SafeButAdmin",
+    "requiresAdmin": true,
+    "includedInSafeDefaults": false
+  },
+  {
+    "id": "windows-old",
+    "displayName": "Previous Windows Installation",
+    "description": "Cleans the Windows.old folder left behind after a major Windows upgrade.",
+    "categoryGroup": "Windows",
+    "badgeLabel": "Large",
+    "safetyNote": "Only remove this if you are sure you do not need to roll back a recent Windows upgrade.",
+    "riskTier": "SafeButAdmin",
+    "requiresAdmin": true,
+    "includedInSafeDefaults": false
+  },
+  {
+    "id": "delivery-optimization-cache",
+    "displayName": "Delivery Optimization Cache",
+    "description": "Cleans cached Delivery Optimization files downloaded by Windows.",
+    "categoryGroup": "Windows",
+    "badgeLabel": "Large",
+    "safetyNote": "Windows may re-download these files later for updates or peer delivery.",
+    "riskTier": "SafeButAdmin",
+    "requiresAdmin": true,
+    "includedInSafeDefaults": false
+  },
+  {
+    "id": "setup-logs",
+    "displayName": "Setup Logs",
+    "description": "Cleans Windows setup and upgrade log folders that can remain after installs and updates.",
+    "categoryGroup": "Diagnostics",
+    "badgeLabel": "Optional",
+    "safetyNote": "Keep these if you still need to troubleshoot a recent Windows installation or upgrade issue.",
+    "riskTier": "SafeButAdmin",
+    "requiresAdmin": true,
+    "includedInSafeDefaults": false
+  },
+  {
+    "id": "recycle-bin",
+    "displayName": "Recycle Bin",
+    "description": "Scans and empties the current user's recycle bin on the system drive.",
+    "categoryGroup": "System",
+    "badgeLabel": "Confirm",
+    "safetyNote": "Irreversible. Keep it unchecked unless you have reviewed deleted items.",
+    "riskTier": "SafeDefault",
+    "requiresAdmin": false,
+    "includedInSafeDefaults": false
+  }
+]

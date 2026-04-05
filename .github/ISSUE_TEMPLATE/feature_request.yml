@@ -1,0 +1,33 @@
+name: Feature request
+description: Propose a product, UX, or tooling improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity
+      description: What user or maintainer problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the behavior, UX, or technical change you want.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Safety / scope considerations
+      description: Mention cleanup safety, Windows-only assumptions, CLI parity, or performance constraints if relevant.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: success
+    attributes:
+      label: What success looks like

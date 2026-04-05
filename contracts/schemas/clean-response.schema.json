@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cdrivecleaner.dev/contracts/clean-response.schema.json",
+  "title": "Clean Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "categories"],
+  "properties": {
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["categoryCount", "successfulCategories", "failedCategories", "totalFreedBytes", "totalDeletedFiles", "totalWarnings"],
+      "properties": {
+        "categoryCount": { "type": "integer", "minimum": 0 },
+        "successfulCategories": { "type": "integer", "minimum": 0 },
+        "failedCategories": { "type": "integer", "minimum": 0 },
+        "totalFreedBytes": { "type": "integer", "minimum": 0 },
+        "totalDeletedFiles": { "type": "integer", "minimum": 0 },
+        "totalWarnings": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["categoryId", "displayName", "freedBytes", "deletedFileCount", "success", "warnings"],
+        "properties": {
+          "categoryId": { "type": "string" },
+          "displayName": { "type": "string" },
+          "freedBytes": { "type": "integer", "minimum": 0 },
+          "deletedFileCount": { "type": "integer", "minimum": 0 },
+          "success": { "type": "boolean" },
+          "warnings": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+# Replace these placeholders with the actual GitHub usernames or teams
+# before relying on CODEOWNERS for required review routing.
+
+# Default owner (replace with your org team or maintainers).
+* @cdrivecleaner/maintainers
+
+# Suggested ownership split.
+/apps/desktop/ @cdrivecleaner/desktop
+/crates/core/ @cdrivecleaner/core
+/crates/cli/ @cdrivecleaner/cli
+/docs/ @cdrivecleaner/docs
+
+# GitHub configuration files are typically maintainer-owned.
+/.github/ @cdrivecleaner/maintainers

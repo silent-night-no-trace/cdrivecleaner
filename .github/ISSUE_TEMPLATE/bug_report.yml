@@ -1,0 +1,63 @@
+name: Bug report
+description: Report a reproducible defect in the desktop app, CLI, or tooling
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Briefly describe the problem.
+      placeholder: What happened and why is it a bug?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Provide the shortest reproducible sequence.
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected area
+      options:
+        - Desktop UI
+        - Full scan tree
+        - Cleanup flow
+        - Scheduled scan
+        - Export/history
+        - CLI/tooling
+        - Packaging/build
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Include OS, toolchain, and app context if relevant.
+      placeholder: Windows version, Rust toolchain, Node version, run mode, etc.
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs, screenshots, or benchmark output
+      description: Paste any useful evidence such as errors, screenshots, or `run_full_scan_stress.py` output.

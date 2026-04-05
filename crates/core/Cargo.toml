@@ -1,0 +1,18 @@
+[package]
+name = "cdrivecleaner-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cdrivecleaner-contracts = { path = "../contracts" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+time.workspace = true
+rayon.workspace = true
+
+[dev-dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true

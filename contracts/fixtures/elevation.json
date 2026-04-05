@@ -1,0 +1,8 @@
+{
+  "isProcessElevated": false,
+  "requiresElevation": true,
+  "adminCategoryIds": [
+    "windows-temp",
+    "windows-update-download"
+  ]
+}

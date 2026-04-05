@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cdrivecleaner.dev/contracts/scan-response.schema.json",
+  "title": "Scan Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "categories"],
+  "properties": {
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["categoryCount", "totalEstimatedBytes", "totalCandidateFiles", "totalWarnings"],
+      "properties": {
+        "categoryCount": { "type": "integer", "minimum": 0 },
+        "totalEstimatedBytes": { "type": "integer", "minimum": 0 },
+        "totalCandidateFiles": { "type": "integer", "minimum": 0 },
+        "totalWarnings": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["categoryId", "displayName", "estimatedBytes", "candidateFileCount", "requiresAdmin", "riskTier", "warnings"],
+        "properties": {
+          "categoryId": { "type": "string" },
+          "displayName": { "type": "string" },
+          "estimatedBytes": { "type": "integer", "minimum": 0 },
+          "candidateFileCount": { "type": "integer", "minimum": 0 },
+          "requiresAdmin": { "type": "boolean" },
+          "riskTier": { "enum": ["SafeDefault", "SafeButAdmin", "Advanced"] },
+          "warnings": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

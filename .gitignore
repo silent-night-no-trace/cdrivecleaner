@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# JavaScript / frontend build output
+dist/
+build/
+.vite/
+coverage/
+
+# Rust build output
+target/
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Local environment / editor files
+.env
+.env.*
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local automation state
+.sisyphus/
+
+# Generated outputs and temporary artifacts
+output/
+tmp/
+temp/
+
+# Logs
+*.log
+
+# Windows oddities / accidental local files
+nul

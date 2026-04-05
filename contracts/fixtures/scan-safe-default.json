@@ -1,0 +1,43 @@
+{
+  "summary": {
+    "categoryCount": 3,
+    "totalEstimatedBytes": 5785600,
+    "totalCandidateFiles": 84,
+    "totalWarnings": 1
+  },
+  "categories": [
+    {
+      "categoryId": "user-temp",
+      "displayName": "User Temp Files",
+      "estimatedBytes": 512000,
+      "candidateFileCount": 20,
+      "requiresAdmin": false,
+      "riskTier": "SafeDefault",
+      "warnings": []
+    },
+    {
+      "categoryId": "thumbnail-cache",
+      "displayName": "Thumbnail Cache",
+      "estimatedBytes": 1048576,
+      "candidateFileCount": 8,
+      "requiresAdmin": false,
+      "riskTier": "SafeDefault",
+      "warnings": []
+    },
+    {
+      "categoryId": "shader-cache",
+      "displayName": "Shader Cache",
+      "estimatedBytes": 4225024,
+      "candidateFileCount": 56,
+      "requiresAdmin": false,
+      "riskTier": "SafeDefault",
+      "warnings": [
+        {
+          "code": "FileInfoAccessDenied",
+          "severity": "Info",
+          "message": "Skipped file info for 'C:\\Fixture\\shader-cache\\locked.bin': Access is denied."
+        }
+      ]
+    }
+  ]
+}

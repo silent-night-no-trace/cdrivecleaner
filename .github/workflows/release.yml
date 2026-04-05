@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows-portable:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable-x86_64-pc-windows-gnullvm
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install LLVM MinGW
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "llvm-mingw.zip"
+          $target = Join-Path $env:RUNNER_TEMP "llvm-mingw"
+          Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20240619/llvm-mingw-20240619-ucrt-x86_64.zip" -OutFile $archive
+          Expand-Archive -Path $archive -DestinationPath $target -Force
+          $bin = Get-ChildItem -Path $target -Directory | Select-Object -First 1 | ForEach-Object { Join-Path $_.FullName "bin" }
+          "LLVM_MINGW_BIN=$bin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm --filter desktop exec playwright install chromium
+
+      - name: Verify workspace before release build
+        run: |
+          pnpm test
+          pnpm build
+          pnpm e2e
+          cargo test --workspace
+
+      - name: Build portable desktop package
+        run: pnpm --filter desktop tauri:build:portable
+
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdrivecleaner-portable-windows
+          path: target/portable/cdrivecleaner-desktop
+          if-no-files-found: error
+
+      - name: Upload bundle artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdrivecleaner-bundles-windows
+          path: |
+            target/release/bundle/nsis/*
+            target/release/bundle/msi/*
+          if-no-files-found: warn
+
+      - name: Publish GitHub release assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            target/portable/cdrivecleaner-desktop/**
+            target/release/bundle/nsis/*
+            target/release/bundle/msi/*

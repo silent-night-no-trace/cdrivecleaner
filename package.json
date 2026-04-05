@@ -1,0 +1,12 @@
+{
+  "name": "cdrivecleaner",
+  "private": true,
+  "packageManager": "pnpm@10.6.0",
+  "scripts": {
+    "dev": "pnpm --filter desktop dev",
+    "build": "pnpm --filter desktop build",
+    "test": "pnpm --filter desktop test",
+    "e2e": "pnpm --filter desktop e2e",
+    "qa:full-regression": "pnpm test && pnpm build && pnpm e2e && python scripts/run_full_scan_stress.py --rebuild-binary"
+  }
+}

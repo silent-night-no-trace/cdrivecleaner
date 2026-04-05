@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cdrivecleaner.dev/contracts/history.schema.json",
+  "title": "History Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["entries"],
+  "properties": {
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["timestamp", "kind", "summary"],
+        "properties": {
+          "timestamp": { "type": "string" },
+          "kind": { "enum": ["scan", "clean"] },
+          "summary": { "type": "string" },
+          "categoryCount": { "type": "integer", "minimum": 0 },
+          "totalEstimatedBytes": { "type": "integer", "minimum": 0 },
+          "totalCandidateFiles": { "type": "integer", "minimum": 0 },
+          "totalWarnings": { "type": "integer", "minimum": 0 },
+          "successfulCategories": { "type": "integer", "minimum": 0 },
+          "failedCategories": { "type": "integer", "minimum": 0 },
+          "totalFreedBytes": { "type": "integer", "minimum": 0 },
+          "totalDeletedFiles": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

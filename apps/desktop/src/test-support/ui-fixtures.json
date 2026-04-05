@@ -1,0 +1,321 @@
+{
+  "categoryPayload": [
+    {
+      "id": "user-temp",
+      "displayName": "User Temp Files",
+      "description": "Cleans the current user's temporary folder.",
+      "categoryGroup": "System",
+      "badgeLabel": "Recommended",
+      "safetyNote": "Low risk.",
+      "riskTier": "SafeDefault",
+      "requiresAdmin": false,
+      "includedInSafeDefaults": true
+    },
+    {
+      "id": "thumbnail-cache",
+      "displayName": "Thumbnail Cache",
+      "description": "Clears cached Explorer thumbnail databases.",
+      "categoryGroup": "Explorer",
+      "badgeLabel": "Recommended",
+      "safetyNote": "Explorer rebuilds thumbnails automatically.",
+      "riskTier": "SafeDefault",
+      "requiresAdmin": false,
+      "includedInSafeDefaults": true
+    },
+    {
+      "id": "shader-cache",
+      "displayName": "Shader Cache",
+      "description": "Cleans shader cache.",
+      "categoryGroup": "Graphics",
+      "badgeLabel": "Recommended",
+      "safetyNote": "Recreated automatically.",
+      "riskTier": "SafeDefault",
+      "requiresAdmin": false,
+      "includedInSafeDefaults": true
+    },
+    {
+      "id": "windows-temp",
+      "displayName": "Windows Temp Files",
+      "description": "Cleans the Windows temp directory.",
+      "categoryGroup": "Windows",
+      "badgeLabel": "Admin",
+      "safetyNote": "Some files may still be in use.",
+      "riskTier": "SafeButAdmin",
+      "requiresAdmin": true,
+      "includedInSafeDefaults": false
+    }
+  ],
+  "initialHistoryPayload": {
+    "entries": []
+  },
+  "postScanHistoryPayload": {
+    "entries": [
+      {
+        "timestamp": "2026-03-22T09:00:00Z",
+        "kind": "scan",
+        "summary": "Scan complete. Categories=3, estimated=0.24 MB, warnings=1."
+      }
+    ]
+  },
+  "postCleanHistoryPayload": {
+    "entries": [
+      {
+        "timestamp": "2026-03-22T09:00:00Z",
+        "kind": "scan",
+        "summary": "Scan complete. Categories=3, estimated=0.24 MB, warnings=1."
+      },
+      {
+        "timestamp": "2026-03-22T09:03:00Z",
+        "kind": "clean",
+        "summary": "Cleanup complete. Successful=2, Failed=1, Freed=0.24 MB."
+      }
+    ]
+  },
+  "fullScanProgressPayload": {
+    "phase": "Scanning",
+    "currentPath": "C:\\PerfLogs",
+    "directoriesScanned": 4,
+    "filesScanned": 16,
+    "warningsCount": 1
+  },
+  "scanPayload": {
+    "summary": {
+      "categoryCount": 3,
+      "totalEstimatedBytes": 256000,
+      "totalCandidateFiles": 9,
+      "totalWarnings": 1
+    },
+    "categories": [
+      {
+        "categoryId": "user-temp",
+        "displayName": "User Temp Files",
+        "estimatedBytes": 36000,
+        "candidateFileCount": 3,
+        "requiresAdmin": false,
+        "riskTier": "SafeDefault",
+        "warnings": []
+      },
+      {
+        "categoryId": "thumbnail-cache",
+        "displayName": "Thumbnail Cache",
+        "estimatedBytes": 60000,
+        "candidateFileCount": 2,
+        "requiresAdmin": false,
+        "riskTier": "SafeDefault",
+        "warnings": []
+      },
+      {
+        "categoryId": "shader-cache",
+        "displayName": "Shader Cache",
+        "estimatedBytes": 160000,
+        "candidateFileCount": 4,
+        "requiresAdmin": false,
+        "riskTier": "SafeDefault",
+        "warnings": [
+          {
+            "code": "FileInfoAccessDenied",
+            "severity": "Info",
+            "message": "Skipped file info for 'C:\\Fixture\\shader-cache\\locked.bin': Access is denied."
+          }
+        ]
+      }
+    ]
+  },
+  "cleanPayload": {
+    "summary": {
+      "categoryCount": 3,
+      "successfulCategories": 2,
+      "failedCategories": 1,
+      "totalFreedBytes": 256000,
+      "totalDeletedFiles": 9,
+      "totalWarnings": 1
+    },
+    "categories": [
+      {
+        "categoryId": "user-temp",
+        "displayName": "User Temp Files",
+        "freedBytes": 36000,
+        "deletedFileCount": 3,
+        "success": true,
+        "warnings": []
+      },
+      {
+        "categoryId": "thumbnail-cache",
+        "displayName": "Thumbnail Cache",
+        "freedBytes": 60000,
+        "deletedFileCount": 2,
+        "success": true,
+        "warnings": []
+      },
+      {
+        "categoryId": "shader-cache",
+        "displayName": "Shader Cache",
+        "freedBytes": 160000,
+        "deletedFileCount": 4,
+        "success": false,
+        "warnings": [
+          {
+            "code": "FileDeleteAccessDenied",
+            "severity": "Attention",
+            "message": "Skipped file 'C:\\Fixture\\shader-cache\\locked.bin': Access is denied."
+          }
+        ]
+      }
+    ]
+  },
+  "preparedScanPayload": {
+    "summary": {
+      "categoryCount": 2,
+      "totalEstimatedBytes": 196000,
+      "totalCandidateFiles": 7,
+      "totalWarnings": 1
+    },
+    "categories": [
+      {
+        "categoryId": "user-temp",
+        "displayName": "User Temp Files",
+        "estimatedBytes": 36000,
+        "candidateFileCount": 3,
+        "requiresAdmin": false,
+        "riskTier": "SafeDefault",
+        "warnings": []
+      },
+      {
+        "categoryId": "shader-cache",
+        "displayName": "Shader Cache",
+        "estimatedBytes": 160000,
+        "candidateFileCount": 4,
+        "requiresAdmin": false,
+        "riskTier": "SafeDefault",
+        "warnings": [
+          {
+            "code": "FileInfoAccessDenied",
+            "severity": "Info",
+            "message": "Skipped file info for 'C:\\Fixture\\shader-cache\\locked.bin': Access is denied."
+          }
+        ]
+      }
+    ]
+  },
+  "preparedCleanPayload": {
+    "summary": {
+      "categoryCount": 2,
+      "successfulCategories": 1,
+      "failedCategories": 1,
+      "totalFreedBytes": 196000,
+      "totalDeletedFiles": 7,
+      "totalWarnings": 1
+    },
+    "categories": [
+      {
+        "categoryId": "user-temp",
+        "displayName": "User Temp Files",
+        "freedBytes": 36000,
+        "deletedFileCount": 3,
+        "success": true,
+        "warnings": []
+      },
+      {
+        "categoryId": "shader-cache",
+        "displayName": "Shader Cache",
+        "freedBytes": 160000,
+        "deletedFileCount": 4,
+        "success": false,
+        "warnings": [
+          {
+            "code": "FileDeleteAccessDenied",
+            "severity": "Attention",
+            "message": "Skipped file 'C:\\Fixture\\shader-cache\\locked.bin': Access is denied."
+          }
+        ]
+      }
+    ]
+  },
+  "fullScanPayload": {
+    "rootPath": "C:\\",
+    "summary": {
+      "categoryCount": 1,
+      "totalEstimatedBytes": 4096,
+      "totalCandidateFiles": 2,
+      "totalWarnings": 1
+    },
+    "tree": {
+      "path": "C:\\",
+      "name": "C:\\",
+      "isDirectory": true,
+      "sizeBytes": 4096,
+      "hasChildren": true,
+      "childrenLoaded": true,
+      "warnings": [
+        {
+          "code": "FileInfoAccessDenied",
+          "severity": "Info",
+          "message": "Skipped file info for 'C:\\locked.bin': Access is denied."
+        }
+      ],
+      "children": [
+        {
+          "path": "C:\\Temp",
+          "name": "Temp",
+          "isDirectory": true,
+          "sizeBytes": 3072,
+          "hasChildren": true,
+          "childrenLoaded": false,
+          "warnings": [],
+          "children": []
+        },
+        {
+          "path": "C:\\notes.txt",
+          "name": "notes.txt",
+          "isDirectory": false,
+          "sizeBytes": 1024,
+          "hasChildren": false,
+          "childrenLoaded": true,
+          "warnings": [],
+          "children": []
+        }
+      ]
+    }
+  },
+  "expandedTempPayload": {
+    "path": "C:\\Temp",
+    "name": "Temp",
+    "isDirectory": true,
+    "sizeBytes": 3072,
+    "hasChildren": true,
+    "childrenLoaded": true,
+    "warnings": [],
+    "children": [
+      {
+        "path": "C:\\Temp\\cache.bin",
+        "name": "cache.bin",
+        "isDirectory": false,
+        "sizeBytes": 3072,
+        "hasChildren": false,
+        "childrenLoaded": true,
+        "warnings": [],
+        "children": []
+      }
+    ]
+  },
+  "deleteSelectedPathsPayload": {
+    "summary": {
+      "selectedCount": 1,
+      "successfulPaths": 1,
+      "failedPaths": 0,
+      "totalEstimatedBytes": 3072,
+      "totalDeletedFiles": 1,
+      "totalWarnings": 0
+    },
+    "paths": [
+      {
+        "path": "C:\\Temp\\cache.bin",
+        "isDirectory": false,
+        "estimatedBytes": 3072,
+        "deletedFileCount": 1,
+        "success": true,
+        "warnings": []
+      }
+    ]
+  }
+}

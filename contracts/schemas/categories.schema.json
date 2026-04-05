@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cdrivecleaner.dev/contracts/categories.schema.json",
+  "title": "Category Metadata List",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "displayName",
+      "description",
+      "categoryGroup",
+      "badgeLabel",
+      "safetyNote",
+      "riskTier",
+      "requiresAdmin",
+      "includedInSafeDefaults"
+    ],
+    "properties": {
+      "id": { "type": "string" },
+      "displayName": { "type": "string" },
+      "description": { "type": "string" },
+      "categoryGroup": { "type": "string" },
+      "badgeLabel": { "type": "string" },
+      "safetyNote": { "type": "string" },
+      "riskTier": { "enum": ["SafeDefault", "SafeButAdmin", "Advanced"] },
+      "requiresAdmin": { "type": "boolean" },
+      "includedInSafeDefaults": { "type": "boolean" }
+    }
+  }
+}

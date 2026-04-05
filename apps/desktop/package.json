@@ -1,0 +1,37 @@
+{
+  "name": "desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "e2e": "node ./scripts/full_ui_selftest.mjs",
+    "e2e:headed": "node ./scripts/full_ui_selftest.mjs --headed",
+    "qa:full-flow": "pnpm run e2e",
+    "qa:full-flow:headed": "pnpm run e2e:headed",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:build:portable": "tauri build --no-bundle && python ../../scripts/stage_runtime_dlls.py"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "@tauri-apps/cli": "^2.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^29.0.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.2.0",
+    "vitest": "^3.1.0"
+  }
+}

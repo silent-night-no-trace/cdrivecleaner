@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate Python helper scripts
+        run: python -m py_compile scripts/run_full_scan_stress.py scripts/stage_runtime_dlls.py scripts/run_disposable_safe_smoke.py
+
+      - name: Run desktop tests
+        run: pnpm test
+
+      - name: Run desktop build
+        run: pnpm build
+
+      - name: Run Rust workspace tests
+        run: cargo test --workspace
+
+  validate-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable-x86_64-pc-windows-gnullvm
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate Python helper scripts
+        run: python -m py_compile scripts/run_full_scan_stress.py scripts/stage_runtime_dlls.py scripts/run_disposable_safe_smoke.py
+
+      - name: Install Playwright browser
+        run: pnpm --filter desktop exec playwright install chromium
+
+      - name: Run desktop tests
+        run: pnpm test
+
+      - name: Run desktop build
+        run: pnpm build
+
+      - name: Run desktop e2e
+        run: pnpm e2e
+
+      - name: Run Rust workspace tests
+        run: cargo test --workspace
+
+      - name: Upload e2e artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-ui-selftest-windows
+          path: output/full-ui-selftest
+          if-no-files-found: warn

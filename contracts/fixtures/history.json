@@ -1,0 +1,24 @@
+{
+  "entries": [
+    {
+      "timestamp": "2026-03-22 09:00:00",
+      "kind": "scan",
+      "summary": "Scan complete. Categories=3, estimated=5.52 MB, warnings=1.",
+      "categoryCount": 3,
+      "totalEstimatedBytes": 5785600,
+      "totalCandidateFiles": 84,
+      "totalWarnings": 1
+    },
+    {
+      "timestamp": "2026-03-22 09:03:00",
+      "kind": "clean",
+      "summary": "Cleanup complete. Successful=2, Failed=1, Freed=5.27 MB.",
+      "categoryCount": 3,
+      "successfulCategories": 2,
+      "failedCategories": 1,
+      "totalFreedBytes": 5523456,
+      "totalDeletedFiles": 81,
+      "totalWarnings": 1
+    }
+  ]
+}
