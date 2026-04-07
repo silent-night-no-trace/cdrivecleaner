@@ -4,13 +4,95 @@ use cdrivecleaner_contracts::{
     ScanExportPayload, ScanResponse, ScheduledScanPlan, ScheduledScanPlanDraft,
 };
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use std::collections::{HashMap, HashSet};
+use std::sync::Mutex;
+use tauri::{AppHandle, Emitter, State};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SettingsMetadata {
     app_version: String,
     log_directory: String,
+}
+
+#[derive(Default)]
+struct LoadedFullScanRegistry {
+    roots: Mutex<HashMap<String, HashSet<String>>>,
+}
+
+fn normalize_registry_path(path: &str) -> String {
+    if cfg!(windows) {
+        path.replace('/', "\\").to_ascii_lowercase()
+    } else {
+        path.to_string()
+    }
+}
+
+fn collect_loaded_node_paths(node: &FullScanTreeNode, target: &mut HashSet<String>) {
+    target.insert(normalize_registry_path(&node.path));
+    for child in &node.children {
+        collect_loaded_node_paths(child, target);
+    }
+}
+
+impl LoadedFullScanRegistry {
+    fn replace_root(&self, root_path: &str, tree: &FullScanTreeNode) -> Result<(), String> {
+        let mut loaded_paths = HashSet::new();
+        collect_loaded_node_paths(tree, &mut loaded_paths);
+        self.roots
+            .lock()
+            .map_err(|_| String::from("full scan registry lock poisoned"))?
+            .insert(normalize_registry_path(root_path), loaded_paths);
+        Ok(())
+    }
+
+    fn extend_root(&self, root_path: &str, tree: &FullScanTreeNode) -> Result<(), String> {
+        let mut loaded_paths = HashSet::new();
+        collect_loaded_node_paths(tree, &mut loaded_paths);
+        let mut roots = self
+            .roots
+            .lock()
+            .map_err(|_| String::from("full scan registry lock poisoned"))?;
+        roots.entry(normalize_registry_path(root_path))
+            .or_default()
+            .extend(loaded_paths);
+        Ok(())
+    }
+
+    fn ensure_loaded_path(&self, root_path: &str, path: &str) -> Result<(), String> {
+        let roots = self
+            .roots
+            .lock()
+            .map_err(|_| String::from("full scan registry lock poisoned"))?;
+        let normalized_root = normalize_registry_path(root_path);
+        let normalized_path = normalize_registry_path(path);
+        let Some(loaded_paths) = roots.get(&normalized_root) else {
+            return Err(String::from(
+                "selected-path actions require a fresh full scan before preview or delete",
+            ));
+        };
+        if loaded_paths.contains(&normalized_path) {
+            return Ok(());
+        }
+        Err(format!(
+            "selected path is not part of the currently loaded full scan: {path}"
+        ))
+    }
+
+    fn ensure_loaded_paths(&self, root_path: &str, paths: &[String]) -> Result<(), String> {
+        for path in paths {
+            self.ensure_loaded_path(root_path, path)?;
+        }
+        Ok(())
+    }
+
+    fn clear_root(&self, root_path: &str) -> Result<(), String> {
+        self.roots
+            .lock()
+            .map_err(|_| String::from("full scan registry lock poisoned"))?
+            .remove(&normalize_registry_path(root_path));
+        Ok(())
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -365,20 +447,36 @@ fn clean_categories(category_ids: Vec<String>) -> Result<CleanResponse, String> 
 }
 
 #[tauri::command]
-fn preview_selected_paths(root_path: String, paths: Vec<String>) -> Result<DeletePathsResponse, String> {
+fn preview_selected_paths(
+    registry: State<'_, LoadedFullScanRegistry>,
+    root_path: String,
+    paths: Vec<String>,
+) -> Result<DeletePathsResponse, String> {
+    registry.ensure_loaded_paths(&root_path, &paths)?;
     cdrivecleaner_core::preview_selected_paths(std::path::Path::new(&root_path), &paths)
         .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-fn delete_selected_paths(root_path: String, paths: Vec<String>) -> Result<DeletePathsResponse, String> {
-    cdrivecleaner_core::delete_selected_paths(std::path::Path::new(&root_path), &paths)
-        .map_err(|error| error.to_string())
+fn delete_selected_paths(
+    registry: State<'_, LoadedFullScanRegistry>,
+    root_path: String,
+    paths: Vec<String>,
+) -> Result<DeletePathsResponse, String> {
+    registry.ensure_loaded_paths(&root_path, &paths)?;
+    let response = cdrivecleaner_core::delete_selected_paths(std::path::Path::new(&root_path), &paths)
+        .map_err(|error| error.to_string())?;
+    registry.clear_root(&root_path)?;
+    Ok(response)
 }
 
 #[tauri::command]
-async fn scan_full_tree(app: AppHandle, root_path: Option<String>) -> Result<FullScanTreeResponse, String> {
-    tauri::async_runtime::spawn_blocking(move || {
+async fn scan_full_tree(
+    app: AppHandle,
+    registry: State<'_, LoadedFullScanRegistry>,
+    root_path: Option<String>,
+) -> Result<FullScanTreeResponse, String> {
+    let response = tauri::async_runtime::spawn_blocking(move || {
         let mut emit_progress = |progress| {
             let _ = app.emit("full-scan-progress", progress);
         };
@@ -393,12 +491,20 @@ async fn scan_full_tree(app: AppHandle, root_path: Option<String>) -> Result<Ful
     })
     .await
     .map_err(|error| error.to_string())?
-    .map_err(|error| error.to_string())
+    .map_err(|error| error.to_string())?;
+    registry.replace_root(&response.root_path, &response.tree)?;
+    Ok(response)
 }
 
 #[tauri::command]
-async fn expand_full_scan_node(root_path: String, node_path: String) -> Result<FullScanTreeNode, String> {
-    tauri::async_runtime::spawn_blocking(move || {
+async fn expand_full_scan_node(
+    registry: State<'_, LoadedFullScanRegistry>,
+    root_path: String,
+    node_path: String,
+) -> Result<FullScanTreeNode, String> {
+    registry.ensure_loaded_path(&root_path, &node_path)?;
+    let registry_root_path = root_path.clone();
+    let node = tauri::async_runtime::spawn_blocking(move || {
         cdrivecleaner_core::expand_full_scan_node(
             std::path::Path::new(&root_path),
             std::path::Path::new(&node_path),
@@ -406,7 +512,9 @@ async fn expand_full_scan_node(root_path: String, node_path: String) -> Result<F
     })
     .await
     .map_err(|error| error.to_string())?
-    .map_err(|error| error.to_string())
+    .map_err(|error| error.to_string())?;
+    registry.extend_root(&registry_root_path, &node)?;
+    Ok(node)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -420,6 +528,7 @@ pub fn run() -> i32 {
     }
 
     tauri::Builder::default()
+        .manage(LoadedFullScanRegistry::default())
         .invoke_handler(tauri::generate_handler![
             list_categories,
             get_history,
@@ -450,6 +559,28 @@ pub fn run() -> i32 {
 mod tests {
     use super::*;
     use cdrivecleaner_contracts::{ScheduledScanMode, ScheduledScanPlan};
+
+    fn sample_full_scan_tree() -> FullScanTreeNode {
+        FullScanTreeNode {
+            path: String::from(r"C:\"),
+            name: String::from(r"C:\"),
+            is_directory: true,
+            size_bytes: 0,
+            has_children: true,
+            children_loaded: true,
+            warnings: Vec::new(),
+            children: vec![FullScanTreeNode {
+                path: String::from(r"C:\Temp"),
+                name: String::from("Temp"),
+                is_directory: true,
+                size_bytes: 0,
+                has_children: true,
+                children_loaded: false,
+                warnings: Vec::new(),
+                children: Vec::new(),
+            }],
+        }
+    }
 
     fn sample_plan() -> ScheduledScanPlan {
         ScheduledScanPlan {
@@ -500,5 +631,69 @@ mod tests {
     fn enable_task_args_toggle_scheduler_state() {
         assert!(build_schtasks_enable_args("daily-safe-scan", true).contains(&String::from("/ENABLE")));
         assert!(build_schtasks_enable_args("daily-safe-scan", false).contains(&String::from("/DISABLE")));
+    }
+
+    #[test]
+    fn loaded_full_scan_registry_only_accepts_loaded_nodes() {
+        let registry = LoadedFullScanRegistry::default();
+        let root = sample_full_scan_tree();
+
+        registry
+            .replace_root(r"C:\", &root)
+            .expect("registry should store root");
+
+        registry
+            .ensure_loaded_paths(r"C:\", &[String::from(r"C:\Temp")])
+            .expect("loaded child should be allowed");
+
+        let error = registry
+            .ensure_loaded_paths(r"C:\", &[String::from(r"C:\Windows")])
+            .expect_err("unloaded path should be rejected");
+        assert!(error.contains("not part of the currently loaded full scan"));
+    }
+
+    #[test]
+    fn loaded_full_scan_registry_accepts_expanded_nodes_and_clears_after_delete() {
+        let registry = LoadedFullScanRegistry::default();
+        let root = sample_full_scan_tree();
+
+        registry
+            .replace_root(r"C:\", &root)
+            .expect("registry should store root");
+
+        let expanded = FullScanTreeNode {
+            path: String::from(r"C:\Temp"),
+            name: String::from("Temp"),
+            is_directory: true,
+            size_bytes: 0,
+            has_children: true,
+            children_loaded: true,
+            warnings: Vec::new(),
+            children: vec![FullScanTreeNode {
+                path: String::from(r"C:\Temp\cache.bin"),
+                name: String::from("cache.bin"),
+                is_directory: false,
+                size_bytes: 1024,
+                has_children: false,
+                children_loaded: false,
+                warnings: Vec::new(),
+                children: Vec::new(),
+            }],
+        };
+
+        registry
+            .extend_root(r"C:\", &expanded)
+            .expect("expanded subtree should register");
+        registry
+            .ensure_loaded_path(r"C:\", r"C:\Temp\cache.bin")
+            .expect("expanded descendant should be allowed");
+
+        registry
+            .clear_root(r"C:\")
+            .expect("registry clear should succeed");
+        let error = registry
+            .ensure_loaded_path(r"C:\", r"C:\Temp")
+            .expect_err("cleared registry should require a fresh scan");
+        assert!(error.contains("require a fresh full scan"));
     }
 }

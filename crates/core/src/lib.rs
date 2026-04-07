@@ -15,6 +15,9 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
+#[cfg(windows)]
+use std::os::windows::fs::MetadataExt;
+
 #[derive(Debug, thiserror::Error)]
 pub enum CoreError {
     #[error("scan is not implemented yet")]
@@ -163,6 +166,13 @@ fn path_delete_warning(path: &Path, error: &std::io::Error) -> CleanupWarning {
         WarningCode::FileDeleteFailed,
         WarningSeverity::Attention,
         format!("Skipped path '{}': {}", path.display(), error),
+    )
+}
+
+fn linked_delete_target_warning(path: &Path) -> CleanupWarning {
+    path_scan_warning(
+        path,
+        "symbolic links and junctions are not supported in selected-path cleanup",
     )
 }
 
@@ -465,6 +475,110 @@ impl FullScanProgressTracker {
 
 fn is_root_delete_target(path: &Path) -> bool {
     path.parent().is_none()
+}
+
+#[cfg(windows)]
+const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+
+fn is_delete_link_metadata(metadata: &fs::Metadata) -> bool {
+    if metadata.file_type().is_symlink() {
+        return true;
+    }
+
+    #[cfg(windows)]
+    {
+        metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+    }
+
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+fn reject_linked_delete_target(path: &Path) -> Result<(), CoreError> {
+    let metadata = fs::symlink_metadata(path).map_err(|error| CoreError::InvalidDeletePath {
+        path: format!("{} ({})", path.display(), error),
+    })?;
+
+    if is_delete_link_metadata(&metadata) {
+        return Err(CoreError::InvalidDeletePath {
+            path: format!(
+                "{} (symbolic links and junctions are not supported in selected-path cleanup)",
+                path.display()
+            ),
+        });
+    }
+
+    Ok(())
+}
+
+fn validate_delete_path_chain(root: &Path, path: &Path) -> Result<fs::Metadata, CoreError> {
+    if !path.starts_with(root) {
+        return Err(CoreError::InvalidDeletePath {
+            path: format!(
+                "{} (delete target escaped reviewed root {})",
+                path.display(),
+                root.display()
+            ),
+        });
+    }
+
+    let mut current = path;
+    let mut target_metadata = None;
+    loop {
+        let metadata = fs::symlink_metadata(current).map_err(|error| CoreError::InvalidDeletePath {
+            path: format!("{} ({})", current.display(), error),
+        })?;
+        if is_delete_link_metadata(&metadata) {
+            return Err(CoreError::InvalidDeletePath {
+                path: format!(
+                    "{} (symbolic links and junctions are not supported in selected-path cleanup)",
+                    current.display()
+                ),
+            });
+        }
+        if current == path {
+            target_metadata = Some(metadata);
+        }
+        if current == root {
+            break;
+        }
+        current = current.parent().ok_or_else(|| CoreError::InvalidDeletePath {
+            path: format!(
+                "{} (delete target escaped reviewed root {})",
+                path.display(),
+                root.display()
+            ),
+        })?;
+    }
+
+    target_metadata.ok_or_else(|| CoreError::InvalidDeletePath {
+        path: path.display().to_string(),
+    })
+}
+
+fn execution_warning_from_delete_path_error(error: CoreError, fallback_path: &Path) -> CleanupWarning {
+    path_scan_warning(fallback_path, &error.to_string())
+}
+
+struct DeleteTargetInspection {
+    is_directory: bool,
+    estimated_bytes: u64,
+    targeted_file_count: u32,
+    warnings: Vec<CleanupWarning>,
+    delete_blocked: bool,
+}
+
+#[derive(Default)]
+struct DeleteExecutionPlan {
+    file_paths: Vec<PathBuf>,
+    directory_paths: Vec<PathBuf>,
+}
+
+struct DeleteExecutionResult {
+    deleted_file_count: u32,
+    warnings: Vec<CleanupWarning>,
 }
 
 pub fn safe_default_scan_roots_from_environment() -> SafeDefaultScanRoots {
@@ -2151,25 +2265,31 @@ fn clean_category_root(
     })
 }
 
-fn inspect_delete_target(path: &Path) -> Result<(bool, u64, u32, Vec<CleanupWarning>), CoreError> {
-    let metadata = fs::metadata(path).map_err(|error| CoreError::InvalidDeletePath {
-        path: format!("{} ({})", path.display(), error),
-    })?;
+fn inspect_delete_target(root: &Path, path: &Path) -> Result<DeleteTargetInspection, CoreError> {
+    let metadata = validate_delete_path_chain(root, path)?;
 
     if metadata.is_file() {
-        return Ok((false, metadata.len(), 1, Vec::new()));
+        return Ok(DeleteTargetInspection {
+            is_directory: false,
+            estimated_bytes: metadata.len(),
+            targeted_file_count: 1,
+            warnings: Vec::new(),
+            delete_blocked: false,
+        });
     }
 
     let mut pending = vec![path.to_path_buf()];
     let mut estimated_bytes = 0_u64;
-    let mut deleted_file_count = 0_u32;
+    let mut targeted_file_count = 0_u32;
     let mut warnings = Vec::new();
+    let mut delete_blocked = false;
 
     while let Some(current) = pending.pop() {
         let entries = match fs::read_dir(&current) {
             Ok(entries) => entries,
             Err(error) => {
                 warnings.push(directory_read_warning(&current, &error));
+                delete_blocked = true;
                 continue;
             }
         };
@@ -2179,17 +2299,30 @@ fn inspect_delete_target(path: &Path) -> Result<(bool, u64, u32, Vec<CleanupWarn
                 Ok(entry) => entry,
                 Err(error) => {
                     warnings.push(directory_entry_warning(&current, &error));
+                    delete_blocked = true;
                     continue;
                 }
             };
             let path = entry.path();
-            let file_type = match entry.file_type() {
-                Ok(file_type) => file_type,
+            let metadata = match fs::symlink_metadata(&path) {
+                Ok(metadata) => metadata,
                 Err(error) => {
-                    warnings.push(entry_type_warning(&path, &error));
+                    warnings.push(path_scan_warning(
+                        &path,
+                        &format!("failed to inspect link metadata: {error}"),
+                    ));
+                    delete_blocked = true;
                     continue;
                 }
             };
+
+            if is_delete_link_metadata(&metadata) {
+                warnings.push(linked_delete_target_warning(&path));
+                delete_blocked = true;
+                continue;
+            }
+
+            let file_type = metadata.file_type();
 
             if file_type.is_dir() {
                 pending.push(path);
@@ -2199,17 +2332,152 @@ fn inspect_delete_target(path: &Path) -> Result<(bool, u64, u32, Vec<CleanupWarn
                 continue;
             }
 
-            match entry.metadata() {
-                Ok(file_metadata) => {
-                    estimated_bytes += file_metadata.len();
-                    deleted_file_count += 1;
-                }
-                Err(error) => warnings.push(file_info_warning(&path, &error)),
+            estimated_bytes += metadata.len();
+            targeted_file_count += 1;
+        }
+    }
+
+    Ok(DeleteTargetInspection {
+        is_directory: true,
+        estimated_bytes,
+        targeted_file_count,
+        warnings,
+        delete_blocked,
+    })
+}
+
+fn build_delete_execution_plan(
+    root: &Path,
+    path: &Path,
+) -> Result<DeleteExecutionPlan, Vec<CleanupWarning>> {
+    let metadata = match validate_delete_path_chain(root, path) {
+        Ok(metadata) => metadata,
+        Err(error) => return Err(vec![execution_warning_from_delete_path_error(error, path)]),
+    };
+
+    let file_type = metadata.file_type();
+    if file_type.is_file() {
+        return Ok(DeleteExecutionPlan {
+            file_paths: vec![path.to_path_buf()],
+            directory_paths: Vec::new(),
+        });
+    }
+    if !file_type.is_dir() {
+        return Err(vec![path_scan_warning(
+            path,
+            "unsupported path type during delete execution",
+        )]);
+    }
+
+    let entries = match fs::read_dir(path) {
+        Ok(entries) => entries,
+        Err(error) => return Err(vec![directory_read_warning(path, &error)]),
+    };
+
+    let mut child_paths = Vec::new();
+    let mut warnings = Vec::new();
+    for entry in entries {
+        match entry {
+            Ok(entry) => child_paths.push(entry.path()),
+            Err(error) => warnings.push(directory_entry_warning(path, &error)),
+        }
+    }
+    if !warnings.is_empty() {
+        return Err(warnings);
+    }
+
+    let mut plan = DeleteExecutionPlan::default();
+    for child_path in child_paths {
+        match build_delete_execution_plan(root, &child_path) {
+            Ok(child_plan) => {
+                plan.file_paths.extend(child_plan.file_paths);
+                plan.directory_paths.extend(child_plan.directory_paths);
+            }
+            Err(mut child_warnings) => warnings.append(&mut child_warnings),
+        }
+    }
+
+    if !warnings.is_empty() {
+        return Err(warnings);
+    }
+
+    plan.directory_paths.push(path.to_path_buf());
+    Ok(plan)
+}
+
+fn execute_delete_plan(root: &Path, plan: DeleteExecutionPlan) -> DeleteExecutionResult {
+    let mut deleted_file_count = 0_u32;
+    let mut warnings = Vec::new();
+
+    for file_path in plan.file_paths {
+        let metadata = match validate_delete_path_chain(root, &file_path) {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                warnings.push(execution_warning_from_delete_path_error(error, &file_path));
+                return DeleteExecutionResult {
+                    deleted_file_count,
+                    warnings,
+                };
+            }
+        };
+        if !metadata.file_type().is_file() {
+            warnings.push(path_scan_warning(
+                &file_path,
+                "delete target changed to a non-file path before removal",
+            ));
+            return DeleteExecutionResult {
+                deleted_file_count,
+                warnings,
+            };
+        }
+
+        match fs::remove_file(&file_path) {
+            Ok(()) => deleted_file_count += 1,
+            Err(error) => {
+                warnings.push(file_delete_warning(&file_path, &error));
+                return DeleteExecutionResult {
+                    deleted_file_count,
+                    warnings,
+                };
             }
         }
     }
 
-    Ok((true, estimated_bytes, deleted_file_count, warnings))
+    for directory_path in plan.directory_paths {
+        let metadata = match validate_delete_path_chain(root, &directory_path) {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                warnings.push(execution_warning_from_delete_path_error(error, &directory_path));
+                return DeleteExecutionResult {
+                    deleted_file_count,
+                    warnings,
+                };
+            }
+        };
+        if !metadata.file_type().is_dir() {
+            warnings.push(path_scan_warning(
+                &directory_path,
+                "delete target changed to a non-directory path before removal",
+            ));
+            return DeleteExecutionResult {
+                deleted_file_count,
+                warnings,
+            };
+        }
+
+        if let Err(error) = fs::remove_dir(&directory_path) {
+            warnings.push(path_delete_warning(&directory_path, &error));
+            return DeleteExecutionResult {
+                deleted_file_count,
+                warnings,
+            };
+        }
+    }
+
+    DeleteExecutionResult {
+        deleted_file_count,
+        warnings,
+    }
 }
 
 fn normalize_delete_targets(root: &Path, paths: &[String]) -> Result<Vec<PathBuf>, CoreError> {
@@ -2224,6 +2492,7 @@ fn normalize_delete_targets(root: &Path, paths: &[String]) -> Result<Vec<PathBuf
     let mut canonical_targets = paths
         .iter()
         .map(|path| {
+            reject_linked_delete_target(Path::new(path))?;
             let canonical =
                 fs::canonicalize(path).map_err(|error| CoreError::InvalidDeletePath {
                     path: format!("{} ({})", path, error),
@@ -2268,19 +2537,21 @@ pub fn preview_selected_paths(
     paths: &[String],
 ) -> Result<DeletePathsResponse, CoreError> {
     let normalized_paths = normalize_delete_targets(root, paths)?;
+    let canonical_root = fs::canonicalize(root).map_err(|error| CoreError::InvalidDeletePath {
+        path: format!("{} ({})", root.display(), error),
+    })?;
     let mut results = Vec::new();
 
     for path in normalized_paths {
-        let (is_directory, estimated_bytes, deleted_file_count, warnings) =
-            inspect_delete_target(&path)?;
+        let inspection = inspect_delete_target(&canonical_root, &path)?;
 
         results.push(PathCleanupResult {
             path: path.display().to_string(),
-            is_directory,
-            estimated_bytes,
-            deleted_file_count,
-            success: warnings.is_empty(),
-            warnings,
+            is_directory: inspection.is_directory,
+            estimated_bytes: inspection.estimated_bytes,
+            deleted_file_count: inspection.targeted_file_count,
+            success: inspection.warnings.is_empty(),
+            warnings: inspection.warnings,
         });
     }
 
@@ -2305,28 +2576,53 @@ pub fn delete_selected_paths(
     paths: &[String],
 ) -> Result<DeletePathsResponse, CoreError> {
     let normalized_paths = normalize_delete_targets(root, paths)?;
+    let canonical_root = fs::canonicalize(root).map_err(|error| CoreError::InvalidDeletePath {
+        path: format!("{} ({})", root.display(), error),
+    })?;
     let mut results = Vec::new();
 
     for path in normalized_paths {
-        let (is_directory, estimated_bytes, targeted_file_count, mut warnings) =
-            inspect_delete_target(&path)?;
+        let inspection = inspect_delete_target(&canonical_root, &path)?;
+        let is_directory = inspection.is_directory;
+        let estimated_bytes = inspection.estimated_bytes;
+        let targeted_file_count = inspection.targeted_file_count;
+        let mut warnings = inspection.warnings;
 
-        let delete_result = if is_directory {
-            fs::remove_dir_all(&path)
-        } else {
-            fs::remove_file(&path)
+        if inspection.delete_blocked {
+            results.push(PathCleanupResult {
+                path: path.display().to_string(),
+                is_directory,
+                estimated_bytes,
+                deleted_file_count: 0,
+                success: false,
+                warnings,
+            });
+            continue;
+        }
+
+        let execution_plan = match build_delete_execution_plan(&canonical_root, &path) {
+            Ok(plan) => plan,
+            Err(mut execution_warnings) => {
+                warnings.append(&mut execution_warnings);
+                results.push(PathCleanupResult {
+                    path: path.display().to_string(),
+                    is_directory,
+                    estimated_bytes,
+                    deleted_file_count: 0,
+                    success: false,
+                    warnings,
+                });
+                continue;
+            }
         };
 
-        let (success, deleted_file_count) = match delete_result {
-            Ok(()) => (true, targeted_file_count),
-            Err(error) => {
-                warnings.push(if is_directory {
-                    path_delete_warning(&path, &error)
-                } else {
-                    file_delete_warning(&path, &error)
-                });
-                (false, 0)
-            }
+        let execution = execute_delete_plan(&canonical_root, execution_plan);
+        warnings.extend(execution.warnings);
+        let success = warnings.is_empty();
+        let deleted_file_count = if success {
+            targeted_file_count
+        } else {
+            execution.deleted_file_count
         };
 
         results.push(PathCleanupResult {
@@ -2363,6 +2659,11 @@ mod tests {
     use std::sync::{Mutex, OnceLock};
     use tempfile::TempDir;
 
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink as create_symlink;
+    #[cfg(windows)]
+    use std::os::windows::fs::{symlink_dir, symlink_file};
+
     fn contracts_fixture_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../contracts/fixtures")
     }
@@ -2376,6 +2677,26 @@ mod tests {
     fn write_file(path: &Path, size: usize) {
         let data = vec![b'x'; size];
         fs::write(path, data).expect("fixture file should write");
+    }
+
+    #[cfg(windows)]
+    fn create_file_symlink(original: &Path, link: &Path) {
+        symlink_file(original, link).expect("file symlink should create");
+    }
+
+    #[cfg(unix)]
+    fn create_file_symlink(original: &Path, link: &Path) {
+        create_symlink(original, link).expect("file symlink should create");
+    }
+
+    #[cfg(windows)]
+    fn create_directory_symlink(original: &Path, link: &Path) {
+        symlink_dir(original, link).expect("directory symlink should create");
+    }
+
+    #[cfg(unix)]
+    fn create_directory_symlink(original: &Path, link: &Path) {
+        create_symlink(original, link).expect("directory symlink should create");
     }
 
     fn build_safe_default_fixture_tree() -> (TempDir, SafeDefaultScanRoots) {
@@ -3269,7 +3590,7 @@ mod tests {
         write_file(&file, 2048);
 
         let response = delete_selected_paths(
-            temp_dir.path(),
+            &root,
             &[nested.display().to_string(), file.display().to_string()],
         )
         .expect("delete selected paths should succeed");
@@ -3293,6 +3614,115 @@ mod tests {
 
         assert!(matches!(error, CoreError::InvalidDeletePath { .. }));
         assert!(outsider.exists());
+    }
+
+    #[test]
+    fn delete_selected_paths_rejects_symlink_targets_inside_root() {
+        let temp_dir = TempDir::new().expect("temp dir should create");
+        let root = temp_dir.path().join("delete-root");
+        let safe_dir = root.join("safe");
+        let outsider = temp_dir.path().join("outside.bin");
+        fs::create_dir_all(&safe_dir).expect("safe dir should create");
+        write_file(&outsider, 512);
+        let linked_file = safe_dir.join("outside-link.bin");
+        create_file_symlink(&outsider, &linked_file);
+
+        let error = delete_selected_paths(&root, &[linked_file.display().to_string()])
+            .expect_err("symlink target should be rejected");
+
+        assert!(matches!(error, CoreError::InvalidDeletePath { .. }));
+        assert!(outsider.exists());
+        assert!(linked_file.exists());
+    }
+
+    #[test]
+    fn delete_selected_paths_blocks_directories_with_nested_symlinks() {
+        let temp_dir = TempDir::new().expect("temp dir should create");
+        let root = temp_dir.path().join("delete-root");
+        let nested = root.join("nested");
+        let outsider_dir = temp_dir.path().join("outside-dir");
+        fs::create_dir_all(&nested).expect("nested dir should create");
+        fs::create_dir_all(&outsider_dir).expect("outside dir should create");
+        write_file(&nested.join("keep.bin"), 256);
+        write_file(&outsider_dir.join("external.bin"), 128);
+        let linked_dir = nested.join("outside-link");
+        create_directory_symlink(&outsider_dir, &linked_dir);
+
+        let preview = preview_selected_paths(&root, &[nested.display().to_string()])
+            .expect("preview should succeed with warnings");
+        assert_eq!(1, preview.summary.failed_paths);
+        assert_eq!(1, preview.paths.len());
+        assert!(!preview.paths[0].success);
+        assert!(preview.paths[0]
+            .warnings
+            .iter()
+            .any(|warning| warning.message.contains("symbolic links and junctions")));
+
+        let delete = delete_selected_paths(&root, &[nested.display().to_string()])
+            .expect("delete should report blocked directory");
+        assert_eq!(1, delete.summary.failed_paths);
+        assert!(nested.exists());
+        assert!(linked_dir.exists());
+        assert!(outsider_dir.exists());
+    }
+
+    #[test]
+    fn execute_delete_plan_rechecks_targets_before_removal() {
+        let temp_dir = TempDir::new().expect("temp dir should create");
+        let root = temp_dir.path().join("delete-root");
+        let nested = root.join("nested");
+        let file = nested.join("cache.bin");
+        let outsider = temp_dir.path().join("outside.bin");
+        fs::create_dir_all(&nested).expect("nested dir should create");
+        write_file(&file, 256);
+        write_file(&outsider, 128);
+
+        let plan = build_delete_execution_plan(&root, &nested).expect("delete plan should build");
+
+        fs::remove_file(&file).expect("original file should remove");
+        create_file_symlink(&outsider, &file);
+
+        let result = execute_delete_plan(&root, plan);
+
+        assert_eq!(0, result.deleted_file_count);
+        assert!(result
+            .warnings
+            .iter()
+            .any(|warning| warning.message.contains("symbolic links and junctions")));
+        assert!(nested.exists());
+        assert!(file.exists());
+        assert!(outsider.exists());
+    }
+
+    #[test]
+    fn execute_delete_plan_rechecks_parent_chain_before_removal() {
+        let temp_dir = TempDir::new().expect("temp dir should create");
+        let root = temp_dir.path().join("delete-root");
+        let parent = root.join("parent");
+        let child = parent.join("child");
+        let file = child.join("cache.bin");
+        let outsider_dir = temp_dir.path().join("outside-dir");
+        let outsider_file = outsider_dir.join("cache.bin");
+        fs::create_dir_all(&child).expect("child dir should create");
+        fs::create_dir_all(&outsider_dir).expect("outside dir should create");
+        write_file(&file, 256);
+        write_file(&outsider_file, 128);
+
+        let plan = build_delete_execution_plan(&root, &parent).expect("delete plan should build");
+
+        fs::remove_dir_all(&child).expect("original child dir should remove");
+        create_directory_symlink(&outsider_dir, &child);
+
+        let result = execute_delete_plan(&root, plan);
+
+        assert_eq!(0, result.deleted_file_count);
+        assert!(result
+            .warnings
+            .iter()
+            .any(|warning| warning.message.contains("symbolic links and junctions")));
+        assert!(parent.exists());
+        assert!(child.exists());
+        assert!(outsider_file.exists());
     }
 
     #[test]
