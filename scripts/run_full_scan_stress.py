@@ -16,7 +16,6 @@ from typing import TypeAlias, cast
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_ROOT = REPO_ROOT / "output" / "full-scan-stress"
-USE_PORTABLE_RUST = REPO_ROOT / "scripts" / "use_portable_rust.ps1"
 # For open-source portability, avoid hard-coded local toolchain paths.
 # Use `cargo` from PATH (or set `CDRIVECLEANER_CARGO_EXE`) and optionally set
 # `LLVM_MINGW_BIN` if your Windows runtime needs gnullvm DLLs on PATH.
@@ -136,6 +135,15 @@ def resolve_llvm_mingw_bin() -> str | None:
     if from_env:
         return from_env
     return None
+
+
+def benchmark_build_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env.setdefault("RUSTUP_TOOLCHAIN", "stable-x86_64-pc-windows-gnullvm")
+    llvm_mingw_bin = resolve_llvm_mingw_bin()
+    if llvm_mingw_bin:
+        env["PATH"] = f"{llvm_mingw_bin};{env.get('PATH', '')}"
+    return env
 
 
 def parse_args() -> StressArgs:
@@ -278,13 +286,6 @@ def ensure_benchmark_binary(rebuild: bool) -> None:
         return
 
     command = [
-        "powershell",
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        str(USE_PORTABLE_RUST),
-        "-Executable",
         resolve_cargo_executable(),
         "build",
         "-p",
@@ -298,6 +299,7 @@ def ensure_benchmark_binary(rebuild: bool) -> None:
         capture_output=True,
         text=True,
         encoding="utf-8",
+        env=benchmark_build_env(),
         check=False,
     )
     if completed.returncode != 0:
@@ -309,10 +311,7 @@ def ensure_benchmark_binary(rebuild: bool) -> None:
 
 
 def run_benchmark(root: Path, args: StressArgs) -> ReportDict:
-    env = os.environ.copy()
-    llvm_mingw_bin = resolve_llvm_mingw_bin()
-    if llvm_mingw_bin:
-        env["PATH"] = f"{llvm_mingw_bin};{env.get('PATH', '')}"
+    env = benchmark_build_env()
 
     completed = subprocess.run(
         [
